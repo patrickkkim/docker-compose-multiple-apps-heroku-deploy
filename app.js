@@ -3,7 +3,12 @@ const { stderr } = require('process');
 const { promisify } = require('util');
 
 console.log('start');
-const exec = promisify(require('child_process').exec)
+const promiss = promisify(require('child_process').exec)
+const exec = async cmd => {
+    const res = await promiss(cmd);
+    console.log(res.stdout);
+    console.log(res.stderr);
+}
 
 const asyncForEach = async (array, callback) => {
     for (let index = 0; index < array.length; index++) {

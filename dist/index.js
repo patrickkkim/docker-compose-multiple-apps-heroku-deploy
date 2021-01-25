@@ -445,7 +445,12 @@ const { stderr } = __webpack_require__(765);
 const { promisify } = __webpack_require__(669);
 
 console.log('start');
-const exec = promisify(__webpack_require__(129).exec)
+const promiss = promisify(__webpack_require__(129).exec)
+const exec = async cmd => {
+    const res = await promiss(cmd);
+    console.log(res.stdout);
+    console.log(res.stderr);
+}
 
 const asyncForEach = async (array, callback) => {
     for (let index = 0; index < array.length; index++) {
