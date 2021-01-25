@@ -1,13 +1,9 @@
 const core = require('@actions/core');
+const { stderr } = require('process');
 const { promisify } = require('util');
 
-const exec = async cmd => {
-    const f = promisify(cmd => require('child_process').exec(cmd, (error, stdout, stderr) => {
-        console.log('log inside');
-        return 'executing...' + cmd + stdout + stderr + error;
-    }));
-    console.log(await f(cmd));
-};
+console.log('start');
+const exec = promisify(require('child_process').exec)
 
 const asyncForEach = async (array, callback) => {
     for (let index = 0; index < array.length; index++) {
@@ -17,14 +13,12 @@ const asyncForEach = async (array, callback) => {
 
 let loginToHeroku = async function loginToHeroku(login, password) {
     try {
-        console.log('Start');
-        console.log(process.env);
-
-        await exec(`cat >~/.netrc <<EOF
+        await exec(`cat >>~/.netrc <<EOF
         machine api.heroku.com
             login ${login}
             password ${password}
-        EOF`);
+        EOF
+        `);
 
         console.log('.netrc file create ✅');
 
@@ -43,6 +37,23 @@ let getImageAppNameList = async function getImageAppNameList(heroku_apps) {
     }
     catch (error) {
         core.setFailed(`Invalid input for heroku app. Error: ${error.message}`);
+    }
+}
+
+let appendHerokuEnvirons = async imageList => {
+    try {
+        if (imageList.length > 0) {
+            await asyncForEach(imageList, async item => {
+                const res = await exec(`heroku config --app ${item.appname} --json`)
+                console.log(res.stdout);
+                Object.entries(JSON.parse(res.stdout)).forEach(([k, v]) => {
+                    process.env[k] = v;
+                });
+            });
+        }
+    }
+    catch (error) {
+        core.setFailed(`Somthing went wrong setting Environs. Error: ${error.message}`)
     }
 }
 
@@ -89,6 +100,7 @@ let buildAndDeploy = async function buildAndDeploy(login, password, dockerCompos
 
 module.exports.loginToHeroku = loginToHeroku;
 module.exports.getImageAppNameList = getImageAppNameList;
+module.exports.appendHerokuEnvirons = appendHerokuEnvirons;
 module.exports.buildDockerCompose = buildDockerCompose;
 module.exports.pushAndDeployAllImages = pushAndDeployAllImages;
 module.exports.buildAndDeploy = buildAndDeploy;
