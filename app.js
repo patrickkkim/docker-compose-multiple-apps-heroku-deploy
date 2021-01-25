@@ -11,6 +11,8 @@ const asyncForEach = async (array, callback) => {
 
 let loginToHeroku = async function loginToHeroku(login, password) {
     try {
+        console.log('Start');
+        console.log(process.env);
 
         await exec(`cat >~/.netrc <<EOF
         machine api.heroku.com
@@ -19,7 +21,7 @@ let loginToHeroku = async function loginToHeroku(login, password) {
         EOF`);
 
         console.log('.netrc file create ✅');
-
+        
         await exec(`echo ${password} | docker login --username=${login} registry.heroku.com --password-stdin`);
 
         console.log('Logged in succefully ✅');
