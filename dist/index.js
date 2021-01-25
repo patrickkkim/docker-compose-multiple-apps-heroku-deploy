@@ -504,7 +504,7 @@ let buildDockerCompose = async function buildDockerCompose(dockerComposeFilePath
         console.log('docker image build started.');
         await exec(`docker-compose -f ${dockerComposeFilePath} build`);
         console.log('docker image build finished.');
-        const res = await exec(`docker images`)
+        const res = await exec(`docker ps -a`)
         console.log(res.stdout)
     }
     catch (error) {
