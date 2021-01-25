@@ -8,6 +8,7 @@ const exec = async cmd => {
     const res = await promiss(cmd);
     console.log(res.stdout);
     console.log(res.stderr);
+    return res;
 }
 
 const asyncForEach = async (array, callback) => {
