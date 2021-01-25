@@ -2,7 +2,7 @@ const core = require('@actions/core');
 const { promisify } = require('util');
 
 const exec = async cmd => {
-    const log = await promisify(require('child_process').exec(cmd, { env: process.env }, (error, stdout, stderr) => {
+    const log = await promisify(require('child_process').exec(cmd, (error, stdout, stderr) => {
         return 'executing...' + cmd + stdout + stderr + error
     }));
     console.log(log);
