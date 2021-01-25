@@ -437,10 +437,11 @@ const core = __webpack_require__(470);
 const { promisify } = __webpack_require__(669);
 
 const exec = async cmd => {
-    const log = await promisify(__webpack_require__(129).exec(cmd, (error, stdout, stderr) => {
-        return 'executing...' + cmd + stdout + stderr + error
+    const f = promisify(cmd => __webpack_require__(129).exec(cmd, (error, stdout, stderr) => {
+        console.log('log inside');
+        return 'executing...' + cmd + stdout + stderr + error;
     }));
-    console.log(log);
+    console.log(await f(cmd));
 };
 
 const asyncForEach = async (array, callback) => {
@@ -461,7 +462,7 @@ let loginToHeroku = async function loginToHeroku(login, password) {
         EOF`);
 
         console.log('.netrc file create ✅');
-        
+
         await exec(`echo ${password} | docker login --username=${login} registry.heroku.com --password-stdin`);
 
         console.log('Logged in succefully ✅');

@@ -2,10 +2,11 @@ const core = require('@actions/core');
 const { promisify } = require('util');
 
 const exec = async cmd => {
-    const log = await promisify(require('child_process').exec(cmd, (error, stdout, stderr) => {
-        return 'executing...' + cmd + stdout + stderr + error
+    const f = promisify(cmd => require('child_process').exec(cmd, (error, stdout, stderr) => {
+        console.log('log inside');
+        return 'executing...' + cmd + stdout + stderr + error;
     }));
-    console.log(log);
+    console.log(await f(cmd));
 };
 
 const asyncForEach = async (array, callback) => {
@@ -26,7 +27,7 @@ let loginToHeroku = async function loginToHeroku(login, password) {
         EOF`);
 
         console.log('.netrc file create ✅');
-        
+
         await exec(`echo ${password} | docker login --username=${login} registry.heroku.com --password-stdin`);
 
         console.log('Logged in succefully ✅');
