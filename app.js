@@ -93,8 +93,9 @@ let pushAndDeployAllImages = async function pushAndDeployAllImages(imageList) {
 let buildAndDeploy = async function buildAndDeploy(login, password, dockerComposeFilePath, imageListString)
 {
         await loginToHeroku(login, password);
-        await buildDockerCompose(dockerComposeFilePath);
         const imageList = await getImageAppNameList(imageListString);
+        await appendHerokuEnvirons(imageList);
+        await buildDockerCompose(dockerComposeFilePath);
         await pushAndDeployAllImages(imageList);
 }
 
