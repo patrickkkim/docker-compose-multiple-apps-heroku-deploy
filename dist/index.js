@@ -1,95 +1,133 @@
-module.exports =
-/******/ (function(modules, runtime) { // webpackBootstrap
-/******/ 	"use strict";
-/******/ 	// The module cache
-/******/ 	var installedModules = {};
-/******/
-/******/ 	// The require function
-/******/ 	function __webpack_require__(moduleId) {
-/******/
-/******/ 		// Check if module is in cache
-/******/ 		if(installedModules[moduleId]) {
-/******/ 			return installedModules[moduleId].exports;
-/******/ 		}
-/******/ 		// Create a new module (and put it into the cache)
-/******/ 		var module = installedModules[moduleId] = {
-/******/ 			i: moduleId,
-/******/ 			l: false,
-/******/ 			exports: {}
-/******/ 		};
-/******/
-/******/ 		// Execute the module function
-/******/ 		var threw = true;
-/******/ 		try {
-/******/ 			modules[moduleId].call(module.exports, module, module.exports, __webpack_require__);
-/******/ 			threw = false;
-/******/ 		} finally {
-/******/ 			if(threw) delete installedModules[moduleId];
-/******/ 		}
-/******/
-/******/ 		// Flag the module as loaded
-/******/ 		module.l = true;
-/******/
-/******/ 		// Return the exports of the module
-/******/ 		return module.exports;
-/******/ 	}
-/******/
-/******/
-/******/ 	__webpack_require__.ab = __dirname + "/";
-/******/
-/******/ 	// the startup function
-/******/ 	function startup() {
-/******/ 		// Load entry module and return exports
-/******/ 		return __webpack_require__(104);
-/******/ 	};
-/******/
-/******/ 	// run startup
-/******/ 	return startup();
-/******/ })
-/************************************************************************/
-/******/ ({
+/******/ (() => { // webpackBootstrap
+/******/ 	var __webpack_modules__ = ({
 
-/***/ 87:
-/***/ (function(module) {
+/***/ 579:
+/***/ ((module, __unused_webpack_exports, __nccwpck_require__) => {
 
-module.exports = require("os");
+const core = __nccwpck_require__(62);
+const { stderr } = __nccwpck_require__(282);
+const { promisify } = __nccwpck_require__(837);
 
-/***/ }),
+console.log('start');
+const promiss = promisify((__nccwpck_require__(81).exec))
+const exec = async cmd => {
+    const res = await promiss(cmd);
+    console.log(res.stdout);
+    console.log(res.stderr);
+    return res;
+}
 
-/***/ 104:
-/***/ (function(__unusedmodule, __unusedexports, __webpack_require__) {
-
-const core = __webpack_require__(470);
-const app = __webpack_require__(964);
-
-async function run() {
-    try {
-        const login = core.getInput('email');
-        const password = core.getInput('api_key');
-        const imageListString = core.getInput('heroku_apps');
-        const dockerComposeFilePath = core.getInput('docker_compose_file');
-
-        await app.buildAndDeploy(login, password, dockerComposeFilePath, imageListString);
-    }
-    catch (error) {
-        console.log({ message: error.message });
-        core.setFailed(error.message);
+const asyncForEach = async (array, callback) => {
+    for (let index = 0; index < array.length; index++) {
+        await callback(array[index], index, array)
     }
 }
 
-run()
+let loginToHeroku = async function loginToHeroku(login, password) {
+    try {
+        await exec(`cat >>~/.netrc <<EOF
+        machine api.heroku.com
+            login ${login}
+            password ${password}
+        EOF
+        `);
+
+        console.log('.netrc file create ✅');
+
+        await exec(`echo ${password} | docker login --username=${login} registry.heroku.com --password-stdin`);
+
+        console.log('Logged in succefully ✅');
+    }
+    catch (error) {
+        core.setFailed(`Authentication process faild. Error: ${error.message}`);
+    }
+}
+
+let getImageAppNameList = async function getImageAppNameList(heroku_apps) {
+    try {
+        return JSON.parse(heroku_apps);
+    }
+    catch (error) {
+        core.setFailed(`Invalid input for heroku app. Error: ${error.message}`);
+    }
+}
+
+let appendHerokuEnvirons = async imageList => {
+    try {
+        if (imageList.length > 0) {
+            await asyncForEach(imageList, async item => {
+                const res = await exec(`heroku config --app ${item.appname} --json`)
+                console.log(res.stdout);
+                Object.entries(JSON.parse(res.stdout)).forEach(([k, v]) => {
+                    process.env[k] = v;
+                });
+            });
+        }
+    }
+    catch (error) {
+        core.setFailed(`Somthing went wrong setting Environs. Error: ${error.message}`)
+    }
+}
+
+let buildDockerCompose = async function buildDockerCompose(dockerComposeFilePath) {
+    try {
+        console.log('docker image pull started.');
+        await exec(`docker-compose -f ${dockerComposeFilePath} pull`);
+        console.log('docker image pull finished');
+        console.log('docker image build started.');
+        await exec(`docker-compose -f ${dockerComposeFilePath} build`);
+        console.log('docker image build finished.');
+        const res = await exec(`docker ps -a`)
+        console.log(res.stdout)
+    }
+    catch (error) {
+        core.setFailed(`Somthing went wrong building your image. Error: ${error.message}`);
+    }
+}
+
+let pushAndDeployAllImages = async function pushAndDeployAllImages(imageList) {
+    try {
+        if (imageList.length > 0) {
+            await asyncForEach(imageList, async (item) => {
+                console.log('Processing image -' + item.imagename);
+                await exec(`docker tag ${item.imagename} registry.heroku.com/${item.appname}/${item.apptype}`);
+                console.log('Container tagged for image - ' + item.imagename);
+                await exec(`docker push registry.heroku.com/${item.appname}/web`);
+                console.log('Container pushed for image - ' + item.imagename);
+                await exec(`heroku container:release ${item.apptype} --app ${item.appname}`);
+                console.log('Container deployed for image - ' + item.imagename);
+            });
+            console.log('App Deployed successfully ✅');
+        } else {
+            core.setFailed(`No image given to process.`);
+        }
+    }
+    catch (error) {
+        core.setFailed(`Somthing went wrong while pushing and deploying your image. Error: ${error.message}`);
+    }
+}
+
+let buildAndDeploy = async function buildAndDeploy(login, password, dockerComposeFilePath, imageListString)
+{
+        await loginToHeroku(login, password);
+        const imageList = await getImageAppNameList(imageListString);
+        await appendHerokuEnvirons(imageList);
+        await buildDockerCompose(dockerComposeFilePath);
+        await pushAndDeployAllImages(imageList);
+}
+
+module.exports.loginToHeroku = loginToHeroku;
+module.exports.getImageAppNameList = getImageAppNameList;
+module.exports.appendHerokuEnvirons = appendHerokuEnvirons;
+module.exports.buildDockerCompose = buildDockerCompose;
+module.exports.pushAndDeployAllImages = pushAndDeployAllImages;
+module.exports.buildAndDeploy = buildAndDeploy;
+
 
 /***/ }),
 
-/***/ 129:
-/***/ (function(module) {
-
-module.exports = require("child_process");
-
-/***/ }),
-
-/***/ 431:
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
+/***/ 416:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
@@ -100,8 +138,8 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-const os = __importStar(__webpack_require__(87));
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const os = __importStar(__nccwpck_require__(37));
 /**
  * Commands
  *
@@ -187,8 +225,8 @@ function escapeProperty(s) {
 
 /***/ }),
 
-/***/ 470:
-/***/ (function(__unusedmodule, exports, __webpack_require__) {
+/***/ 62:
+/***/ (function(__unused_webpack_module, exports, __nccwpck_require__) {
 
 "use strict";
 
@@ -208,10 +246,10 @@ var __importStar = (this && this.__importStar) || function (mod) {
     result["default"] = mod;
     return result;
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-const command_1 = __webpack_require__(431);
-const os = __importStar(__webpack_require__(87));
-const path = __importStar(__webpack_require__(622));
+Object.defineProperty(exports, "__esModule", ({ value: true }));
+const command_1 = __nccwpck_require__(416);
+const os = __importStar(__nccwpck_require__(37));
+const path = __importStar(__nccwpck_require__(17));
 /**
  * The code to exit an action
  */
@@ -416,147 +454,108 @@ exports.getState = getState;
 
 /***/ }),
 
-/***/ 622:
-/***/ (function(module) {
+/***/ 81:
+/***/ ((module) => {
 
+"use strict";
+module.exports = require("child_process");
+
+/***/ }),
+
+/***/ 37:
+/***/ ((module) => {
+
+"use strict";
+module.exports = require("os");
+
+/***/ }),
+
+/***/ 17:
+/***/ ((module) => {
+
+"use strict";
 module.exports = require("path");
 
 /***/ }),
 
-/***/ 669:
-/***/ (function(module) {
+/***/ 282:
+/***/ ((module) => {
 
-module.exports = require("util");
-
-/***/ }),
-
-/***/ 765:
-/***/ (function(module) {
-
+"use strict";
 module.exports = require("process");
 
 /***/ }),
 
-/***/ 964:
-/***/ (function(module, __unusedexports, __webpack_require__) {
+/***/ 837:
+/***/ ((module) => {
 
-const core = __webpack_require__(470);
-const { stderr } = __webpack_require__(765);
-const { promisify } = __webpack_require__(669);
-
-console.log('start');
-const promiss = promisify(__webpack_require__(129).exec)
-const exec = async cmd => {
-    const res = await promiss(cmd);
-    console.log(res.stdout);
-    console.log(res.stderr);
-    return res;
-}
-
-const asyncForEach = async (array, callback) => {
-    for (let index = 0; index < array.length; index++) {
-        await callback(array[index], index, array)
-    }
-}
-
-let loginToHeroku = async function loginToHeroku(login, password) {
-    try {
-        await exec(`cat >>~/.netrc <<EOF
-        machine api.heroku.com
-            login ${login}
-            password ${password}
-        EOF
-        `);
-
-        console.log('.netrc file create ✅');
-
-        await exec(`echo ${password} | docker login --username=${login} registry.heroku.com --password-stdin`);
-
-        console.log('Logged in succefully ✅');
-    }
-    catch (error) {
-        core.setFailed(`Authentication process faild. Error: ${error.message}`);
-    }
-}
-
-let getImageAppNameList = async function getImageAppNameList(heroku_apps) {
-    try {
-        return JSON.parse(heroku_apps);
-    }
-    catch (error) {
-        core.setFailed(`Invalid input for heroku app. Error: ${error.message}`);
-    }
-}
-
-let appendHerokuEnvirons = async imageList => {
-    try {
-        if (imageList.length > 0) {
-            await asyncForEach(imageList, async item => {
-                const res = await exec(`heroku config --app ${item.appname} --json`)
-                console.log(res.stdout);
-                Object.entries(JSON.parse(res.stdout)).forEach(([k, v]) => {
-                    process.env[k] = v;
-                });
-            });
-        }
-    }
-    catch (error) {
-        core.setFailed(`Somthing went wrong setting Environs. Error: ${error.message}`)
-    }
-}
-
-let buildDockerCompose = async function buildDockerCompose(dockerComposeFilePath) {
-    try {
-        console.log('docker image build started.');
-        await exec(`docker-compose -f ${dockerComposeFilePath} build`);
-        console.log('docker image build finished.');
-        const res = await exec(`docker ps -a`)
-        console.log(res.stdout)
-    }
-    catch (error) {
-        core.setFailed(`Somthing went wrong building your image. Error: ${error.message}`);
-    }
-}
-
-let pushAndDeployAllImages = async function pushAndDeployAllImages(imageList) {
-    try {
-        if (imageList.length > 0) {
-            await asyncForEach(imageList, async (item) => {
-                console.log('Processing image -' + item.imagename);
-                await exec(`docker tag ${item.imagename} registry.heroku.com/${item.appname}/${item.apptype}`);
-                console.log('Container tagged for image - ' + item.imagename);
-                await exec(`docker push registry.heroku.com/${item.appname}/web`);
-                console.log('Container pushed for image - ' + item.imagename);
-                await exec(`heroku container:release ${item.apptype} --app ${item.appname}`);
-                console.log('Container deployed for image - ' + item.imagename);
-            });
-            console.log('App Deployed successfully ✅');
-        } else {
-            core.setFailed(`No image given to process.`);
-        }
-    }
-    catch (error) {
-        core.setFailed(`Somthing went wrong while pushing and deploying your image. Error: ${error.message}`);
-    }
-}
-
-let buildAndDeploy = async function buildAndDeploy(login, password, dockerComposeFilePath, imageListString)
-{
-        await loginToHeroku(login, password);
-        const imageList = await getImageAppNameList(imageListString);
-        await appendHerokuEnvirons(imageList);
-        await buildDockerCompose(dockerComposeFilePath);
-        await pushAndDeployAllImages(imageList);
-}
-
-module.exports.loginToHeroku = loginToHeroku;
-module.exports.getImageAppNameList = getImageAppNameList;
-module.exports.appendHerokuEnvirons = appendHerokuEnvirons;
-module.exports.buildDockerCompose = buildDockerCompose;
-module.exports.pushAndDeployAllImages = pushAndDeployAllImages;
-module.exports.buildAndDeploy = buildAndDeploy;
-
+"use strict";
+module.exports = require("util");
 
 /***/ })
 
-/******/ });
+/******/ 	});
+/************************************************************************/
+/******/ 	// The module cache
+/******/ 	var __webpack_module_cache__ = {};
+/******/ 	
+/******/ 	// The require function
+/******/ 	function __nccwpck_require__(moduleId) {
+/******/ 		// Check if module is in cache
+/******/ 		var cachedModule = __webpack_module_cache__[moduleId];
+/******/ 		if (cachedModule !== undefined) {
+/******/ 			return cachedModule.exports;
+/******/ 		}
+/******/ 		// Create a new module (and put it into the cache)
+/******/ 		var module = __webpack_module_cache__[moduleId] = {
+/******/ 			// no module.id needed
+/******/ 			// no module.loaded needed
+/******/ 			exports: {}
+/******/ 		};
+/******/ 	
+/******/ 		// Execute the module function
+/******/ 		var threw = true;
+/******/ 		try {
+/******/ 			__webpack_modules__[moduleId].call(module.exports, module, module.exports, __nccwpck_require__);
+/******/ 			threw = false;
+/******/ 		} finally {
+/******/ 			if(threw) delete __webpack_module_cache__[moduleId];
+/******/ 		}
+/******/ 	
+/******/ 		// Return the exports of the module
+/******/ 		return module.exports;
+/******/ 	}
+/******/ 	
+/************************************************************************/
+/******/ 	/* webpack/runtime/compat */
+/******/ 	
+/******/ 	if (typeof __nccwpck_require__ !== 'undefined') __nccwpck_require__.ab = __dirname + "/";
+/******/ 	
+/************************************************************************/
+var __webpack_exports__ = {};
+// This entry need to be wrapped in an IIFE because it need to be isolated against other modules in the chunk.
+(() => {
+const core = __nccwpck_require__(62);
+const app = __nccwpck_require__(579);
+
+async function run() {
+    try {
+        const login = core.getInput('email');
+        const password = core.getInput('api_key');
+        const imageListString = core.getInput('heroku_apps');
+        const dockerComposeFilePath = core.getInput('docker_compose_file');
+
+        await app.buildAndDeploy(login, password, dockerComposeFilePath, imageListString);
+    }
+    catch (error) {
+        console.log({ message: error.message });
+        core.setFailed(error.message);
+    }
+}
+
+run()
+})();
+
+module.exports = __webpack_exports__;
+/******/ })()
+;

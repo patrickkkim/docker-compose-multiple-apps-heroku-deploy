@@ -65,6 +65,9 @@ let appendHerokuEnvirons = async imageList => {
 
 let buildDockerCompose = async function buildDockerCompose(dockerComposeFilePath) {
     try {
+        console.log('docker image pull started.');
+        await exec(`docker-compose -f ${dockerComposeFilePath} pull`);
+        console.log('docker image pull finished');
         console.log('docker image build started.');
         await exec(`docker-compose -f ${dockerComposeFilePath} build`);
         console.log('docker image build finished.');

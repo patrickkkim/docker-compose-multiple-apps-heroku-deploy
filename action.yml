@@ -1,4 +1,4 @@
-name: 'Deploy Multiple Docker Images to Heroku Apps with Logs'
+name: 'Deploy Multiple Docker Images to Heroku Apps with Logs + Pull'
 author: 'pysan3'
 description: 'A simple action to build multiple docker images using docker-compose, push and deploy your applications to Heroku Apps.'
 inputs:
