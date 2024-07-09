@@ -86,7 +86,7 @@ let pushAndDeployAllImages = async function pushAndDeployAllImages(imageList) {
                 console.log('Processing image -' + item.imagename);
                 await exec(`docker tag ${item.imagename} registry.heroku.com/${item.appname}/${item.apptype}`);
                 console.log('Container tagged for image - ' + item.imagename);
-                await exec(`docker push registry.heroku.com/${item.appname}/web`);
+                await exec(`docker push registry.heroku.com/${item.appname}/${item.apptype}`);
                 console.log('Container pushed for image - ' + item.imagename);
                 await exec(`heroku container:release ${item.apptype} --app ${item.appname}`);
                 console.log('Container deployed for image - ' + item.imagename);
